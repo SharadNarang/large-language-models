@@ -53,7 +53,7 @@
 # HuggingFace Hub: https://huggingface.co/inference-api
 
 import os
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = "<FILL IN>"
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
 # COMMAND ----------
 
@@ -130,7 +130,8 @@ hf_llm = HuggingFacePipeline.from_model_id(
     task="text2text-generation",
     model_kwargs={
         "temperature": 0,
-        "max_length": 128
+        "max_length": 128,
+        "cache_dir": DA.paths.datasets,
     },
 )
 
@@ -191,12 +192,16 @@ all_shakespeare_text = loader.load()
 # COMMAND ----------
 
 # TODO
-text_splitter = <FILL_IN> #hint try chunk sizes of 1024 and an overlap of 256 (this will take approx. 10mins with this model to build our vector database index)
-texts = <FILL_IN>
+text_splitter = CharacterTextSplitter(chunk_size=1024, chunk_overlap=256) #hint try chunk sizes of 1024 and an overlap of 256 (this will take approx. 10mins with this model to build our vector database index)
+texts = text_splitter.split_documents(all_shakespeare_text)
 
-model_name = <FILL_IN> #hint, try "sentence-transformers/all-MiniLM-L6-v2" as your model
-embeddings = <FILL_IN>
-docsearch = <FILL_IN>
+model_name = "sentence-transformers/all-MiniLM-L6-v2" #hint, try "sentence-transformers/all-MiniLM-L6-v2" as your model
+embeddings = HuggingFaceEmbeddings(
+    model_name=model_name, cache_folder=DA.paths.datasets
+) 
+docsearch = Chroma.from_documents(
+    texts, embeddings
+)
 
 # COMMAND ----------
 
@@ -219,10 +224,10 @@ dbTestQuestion3_1(embeddings, docsearch)
 
 # TODO
 # Let's start with the simplest method: "Stuff" which puts all of the data into the prompt and asks a question of it:
-qa = RetrievalQA.from_chain_type(<FILL_IN>)
+qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="stuff", retriever=retriever)
 query = "What happens in the play Hamlet?"
 # Run the query
-query_results_hamlet = <FILL_IN>
+query_results_hamlet = qa.run("What happens in the play Hamlet?")
 
 query_results_hamlet
 
@@ -245,13 +250,14 @@ dbTestQuestion3_2(qa, query_results_hamlet)
 # MAGIC - [`map_reduce`](https://docs.langchain.com/docs/components/chains/index_related_chains#map-reduce) - This method involves running an initial prompt on each chunk of data (for summarization tasks, this could be a summary of that chunk; for question-answering tasks, it could be an answer based solely on that chunk).
 # MAGIC - [`refine`](https://docs.langchain.com/docs/components/chains/index_related_chains#refine) - This method involves running an initial prompt on the first chunk of data, generating some output. For the remaining documents, that output is passed in, along with the next document, asking the LLM to refine the output based on the new document.
 # MAGIC - [`map_rerank`](https://docs.langchain.com/docs/components/chains/index_related_chains#map-rerank) - This method involves running an initial prompt on each chunk of data, that not only tries to complete a task but also gives a score for how certain it is in its answer. The responses are then ranked according to this score, and the highest score is returned.
+# MAGIC   * NOTE: For this exercise, `map_rerank` will [error](https://github.com/hwchase17/langchain/issues/3970).
 
 # COMMAND ----------
 
 # TODO
-qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type=<FILL_IN>, retriever=docsearch.as_retriever())
+qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="refine", retriever=docsearch.as_retriever())
 query = "Who is the main character in the Merchant of Venice?"
-query_results_venice = <FILL_IN>
+query_results_venice = qa.run(query)
 
 query_results_venice
 
@@ -272,9 +278,9 @@ dbTestQuestion3_3(qa, query_results_venice)
 # TODO
 # That's much better! Let's try another type
 
-qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type=<FILL_IN>, retriever=docsearch.as_retriever())
+qa = RetrievalQA.from_chain_type(llm=hf_llm, chain_type="map_reduce", retriever=docsearch.as_retriever())
 query = "What happens to romeo and juliet?"
-query_results_romeo = <FILL_IN>
+query_results_romeo = qa.run(query)
 
 query_results_romeo
 
