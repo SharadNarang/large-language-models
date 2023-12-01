@@ -60,8 +60,8 @@ from transformers import pipeline
 # COMMAND ----------
 
 xsum_dataset = load_dataset(
-    "xsum", version="1.2.0"
-)  
+    "xsum", version="1.2.0", cache_dir=DA.paths.datasets
+)  # Note: We specify cache_dir to use predownloaded data.
 xsum_sample = xsum_dataset["train"].select(range(10))
 display(xsum_sample.to_pandas())
 
@@ -75,10 +75,18 @@ display(xsum_sample.to_pandas())
 # TODO
 
 # Constructor a summarization pipeline
-summarizer = <FILL_IN>
+summarizer = pipeline(
+    task="summarization",
+    model="facebook/bart-large-cnn",
+    min_length=20,
+    max_length=40,
+    truncation=True,
+    model_kwargs={"cache_dir": DA.paths.datasets},
+)
+
 
 # Apply the pipeline to the batch of articles in `xsum_sample`
-summarization_results = <FILL_IN>
+summarization_results = summarizer(xsum_sample["document"])
 summarization_results
 
 # COMMAND ----------
@@ -108,20 +116,21 @@ display(
 # MAGIC
 # MAGIC We will use the [Helsinki-NLP/tatoeba_mt](https://huggingface.co/datasets/Helsinki-NLP/tatoeba_mt) dataset.  It includes sentence pairs from many languages, but we will focus on translating Japanese to English.
 # MAGIC
-# MAGIC If you feel stuck, please refer to the hints at the end of this section.
+# MAGIC Hints in case you feel stuck on this task:
+# MAGIC * Some models can handle *a lot* of languages.  Check out [NLLB](https://huggingface.co/docs/transformers/model_doc/nllb), the No Language Left Behind model ([research paper](https://arxiv.org/abs/2207.04672)).
+# MAGIC * The "translation" task for `pipeline` takes optional parameters `src_lang` (source language) and `tgt_lang` (target language), which are important when the model can handle multiple languages.  To figure out what codes to use to specify languages (and scripts for those languages), it can be helpful to find existing examples of using your model; for NLLB, check out [this Python script with codes](https://huggingface.co/spaces/Geonmo/nllb-translation-demo/blob/main/flores200_codes.py) or similar demo resources.
+# MAGIC
 
 # COMMAND ----------
 
-from datasets.utils.info_utils import VerificationMode
-
 jpn_dataset = load_dataset(
     "Helsinki-NLP/tatoeba_mt",
-    "eng-jpn",
-    split="test", 
-    verification_mode=VerificationMode.NO_CHECKS
+    version="1.0.0",
+    language_pair="eng-jpn",
+    cache_dir=DA.paths.datasets,
 )
 jpn_sample = (
-    jpn_dataset
+    jpn_dataset["test"]
     .select(range(10))
     .rename_column("sourceString", "English")
     .rename_column("targetString", "Japanese")
@@ -140,7 +149,11 @@ display(jpn_sample.to_pandas())
 # TODO
 
 # Construct a pipeline for translating Japanese to English.
-translation_pipeline = <FILL_IN>
+translation_pipeline = pipeline(
+    task="translation",
+    model="Helsinki-NLP/opus-mt-jap-en",
+    model_kwargs={"cache_dir": DA.paths.datasets},
+)
 
 # Apply your pipeline on the sample of Japanese text in: jpn_sample["Japanese"]
 translation_results = translation_pipeline(jpn_sample["Japanese"])
@@ -161,13 +174,6 @@ display(translation_results_df)
 
 # COMMAND ----------
 
-# MAGIC %md If you feel stuck on the above Japanese -> English translation task, here are some hints:
-# MAGIC * Some models can handle *a lot* of languages.  Check out [NLLB](https://huggingface.co/docs/transformers/model_doc/nllb), the No Language Left Behind model ([research paper](https://arxiv.org/abs/2207.04672)).
-# MAGIC * The "translation" task for `pipeline` takes optional parameters `src_lang` (source language) and `tgt_lang` (target language), which are important when the model can handle multiple languages.  To figure out what codes to use to specify languages (and scripts for those languages), it can be helpful to find existing examples of using your model; for NLLB, check out [this Python script with codes](https://huggingface.co/spaces/Geonmo/nllb-translation-demo/blob/main/flores200_codes.py) or similar demo resources.
-# MAGIC
-
-# COMMAND ----------
-
 # MAGIC %md ### Question 3: Few-shot learning
 # MAGIC
 # MAGIC In this section, you will build a prompt which gets an LLM to answer a few-shot learning problem.  Your prompt will have 3 sections:
@@ -178,7 +184,7 @@ display(translation_results_df)
 # MAGIC
 # MAGIC Your goal is to make the LLM answer the new query, with as good a response as possible.
 # MAGIC
-# MAGIC More specifically, your prompt should following this template:
+# MAGIC More specifically, your prompt should follow this template:
 # MAGIC ```
 # MAGIC <High-level instruction about the task: Given input_label, generate output_label.>:
 # MAGIC
@@ -211,6 +217,7 @@ few_shot_pipeline = pipeline(
     task="text-generation",
     model="EleutherAI/gpt-neo-1.3B",
     max_new_tokens=50,
+    model_kwargs={"cache_dir": DA.paths.datasets},
 )  # Use a predownloaded model
 
 # Get the token ID for "###", which we will use as the EOS token below.  (Recall we did this in the demo notebook.)
@@ -231,13 +238,13 @@ eos_token_id = few_shot_pipeline.tokenizer.encode("###")[0]
 prompt =\
 """<High-level instruction about the task>:
 
-[<input_label>]: "<input text>"
-[<output_label>]: "<output_text>"
+[<input_label>]: "How are you doing"
+[<output_label>]: "आप कैसे हैं"
 ###
-[<input_label>]: "<input text>"
-[<output_label>]: "<output_text>"
+[<input_label>]: "What is your name"
+[<output_label>]: "आपका क्या नाम है"
 ###
-[<input_label>]: "<input text>"
+[<input_label>]: "Where do you stay"
 [<output_label>]:"""
 
 # COMMAND ----------
@@ -266,12 +273,12 @@ dbTestQuestion1_3(few_shot_pipeline, prompt, results[0]["generated_text"])
 
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-xsum_dataset = load_dataset("xsum", version="1.2.0")
+xsum_dataset = load_dataset("xsum", version="1.2.0", cache_dir=DA.paths.datasets)
 xsum_sample = xsum_dataset["train"].select(range(10))
 
-tokenizer = T5Tokenizer.from_pretrained("t5-small")
+tokenizer = T5Tokenizer.from_pretrained("t5-small", cache_dir=DA.paths.datasets)
 model = T5ForConditionalGeneration.from_pretrained(
-    "t5-small"
+    "t5-small", cache_dir=DA.paths.datasets
 )
 
 # Prepare articles for T5, which requires a "summarize: " prefix.
@@ -328,17 +335,17 @@ def display_summaries(decoded_summaries: list) -> None:
 #
 # We show all parameter settings for ease-of-modification, but in practice, you would only set relevant ones.
 inputs = tokenizer(
-    articles, max_length=1024, return_tensors="pt", padding=True, truncation=True
+    articles, max_length=512, return_tensors="pt", padding=True, truncation=True
 )
 
 summary_ids = model.generate(
     inputs.input_ids,
     attention_mask=inputs.attention_mask,
-    do_sample=True,
+    do_sample=False,
     num_beams=2,
     min_length=0,
     max_length=40,
-    top_k=20,
+    top_k=10,
     top_p=0.5,
     temperature=0.7,
 )
