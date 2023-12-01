@@ -79,12 +79,12 @@ chroma_client = chromadb.Client(
 
 # MAGIC %md
 # MAGIC
-# MAGIC Fill out `collection_name` below.
+# MAGIC Assign the value of `my_talks` to the `collection_name` variable.
 
 # COMMAND ----------
 
 # TODO
-collection_name = "<FILL_IN>"
+collection_name = "my_talks"
 
 # If you have created the collection before, you need to delete the collection first
 if len(chroma_client.list_collections()) > 0 and collection_name in [chroma_client.list_collections()[0].name]:
@@ -104,14 +104,14 @@ dbTestQuestion2_1(collection_name)
 # MAGIC %md
 # MAGIC ## Question 2
 # MAGIC
-# MAGIC Add data to collection
+# MAGIC [Add](https://docs.trychroma.com/reference/Collection#add) data to the collection. 
 
 # COMMAND ----------
 
 # TODO
 talks_collection.add(
-    documents=<FILL_IN>,
-    ids=<FILL_IN>
+    documents=dais_pdf["Title"][:181].tolist(),
+    ids=[f"id{x}" for x in range(181)],
 )
 
 # COMMAND ----------
@@ -125,7 +125,7 @@ dbTestQuestion2_2(talks_collection)
 # MAGIC %md
 # MAGIC ## Question 3
 # MAGIC
-# MAGIC Query for relevant documents
+# MAGIC [Query](https://docs.trychroma.com/reference/Collection#query) for relevant documents. If you are looking for talks related to language models, your query texts could be `language models`. 
 
 # COMMAND ----------
 
@@ -133,8 +133,8 @@ dbTestQuestion2_2(talks_collection)
 import json
 
 results = talks_collection.query(
-    query_texts=<FILL_IN>,
-    n_results=<FILL_IN>
+    query_texts=["language models"],
+    n_results=181
 )
 
 print(json.dumps(results, indent=4))
@@ -150,7 +150,7 @@ dbTestQuestion2_3(results)
 # MAGIC %md
 # MAGIC ## Question 4
 # MAGIC
-# MAGIC Load language model
+# MAGIC Load a language model and create a [pipeline](https://huggingface.co/docs/transformers/main/en/main_classes/pipelines).
 
 # COMMAND ----------
 
@@ -158,12 +158,12 @@ dbTestQuestion2_3(results)
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 # Pick a model from HuggingFace that can generate text
-model_id = "<FILL_IN>"
+model_id = "gpt2"
 tokenizer = AutoTokenizer.from_pretrained(model_id)
 lm_model = AutoModelForCausalLM.from_pretrained(model_id)
 
 pipe = pipeline(
-    "<FILL_IN>", model=lm_model, tokenizer=tokenizer, max_new_tokens=512, device_map="auto", handle_long_generation="hole"
+    "text-generation", model=lm_model, tokenizer=tokenizer, max_new_tokens=512, device_map="auto", handle_long_generation="hole"
 )
 
 # COMMAND ----------
@@ -183,16 +183,17 @@ dbTestQuestion2_4(pipe)
 
 # TODO
 # Come up with a question that you need the LLM assistant to help you with
-# A sample question is "Help me find sessions related to XYZ"
-question = "<FILL_IN>"
+# A sample question is "Help me find sessions related to XYZ" 
+# Note: Your "XYZ" should be related to the query you passed in Question 3. 
+question = "How to use Unity Catalog"
 
 # Provide all returned similar documents from the cell above below
-context = <FILL_IN>
+context = " ".join([f"#{str(i)}" for i in results["documents"][0]])
 
 # Feel free to be creative how you construct the prompt. You can use the demo notebook as a jumpstart reference.
 # You can also provide more requirements in the text how you want the answers to look like.
 # Example requirement: "Recommend top-5 relevant sessions for me to attend."
-prompt_template = <FILL_IN>
+prompt_template = f"Relevant context: {context}\n\n The user's question: {question}"
 
 # COMMAND ----------
 
@@ -212,7 +213,7 @@ dbTestQuestion2_5(question, context, prompt_template)
 # COMMAND ----------
 
 # TODO
-lm_response = pipe(<FILL_IN>)
+lm_response = pipe(prompt_template)
 print(lm_response[0]["generated_text"])
 
 # COMMAND ----------
