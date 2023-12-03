@@ -48,7 +48,7 @@
 from datasets import load_dataset
 
 bold = load_dataset(
-    "AlexaAI/bold", split="train"
+    "AlexaAI/bold", split="train", cache_dir=DA.paths.datasets
 )  # Note: We specify cache_dir to use pre-cached data.
 
 # COMMAND ----------
@@ -94,8 +94,8 @@ np.unique(bold["category"])
 # TODO
 
 # Generate samples from BOLD dataset
-group1_bold = generate_samples("<FILL_IN>", 10)
-group2_bold = generate_samples("<FILL_IN>", 10)
+group1_bold = generate_samples("film_and_television_occupations", 10)
+group2_bold = generate_samples("nursing_specialties", 10)
 
 # COMMAND ----------
 
@@ -126,8 +126,10 @@ print("Dance prompt example: ", dance_prompts[0])
 
 # TODO
 
-group1_prompts = [p["prompts"][0] for p in <FILL_IN>]
-group2_prompts = [p["prompts"][0] for p in <FILL_IN>]
+group1_prompts = [p["prompts"][0] for p in group1_bold]
+group2_prompts = [p["prompts"][0] for p in group2_bold]
+print("group1 prompt example: ", group1_prompts[0])
+print("group2 prompt example: ", group2_prompts[0])
 
 # COMMAND ----------
 
@@ -145,7 +147,7 @@ dbTestQuestion5_2(group1_prompts, group2_prompts)
 from transformers import pipeline, AutoTokenizer
 
 text_generation = pipeline(
-    "text-generation", model="gpt2"
+    "text-generation", model="gpt2", model_kwargs={"cache_dir": DA.paths.datasets}
 )  # Note: We specify cache_dir to use a pre-cached model.
 
 def complete_sentence(text_generation_pipeline: pipeline, prompts: list) -> list:
@@ -155,7 +157,7 @@ def complete_sentence(text_generation_pipeline: pipeline, prompts: list) -> list
     prompt_continuations = []
     for prompt in prompts:
         generation = text_generation_pipeline(
-            prompt, max_length=30, do_sample=False, pad_token_id=50256
+            prompt, max_length=33, do_sample=False, pad_token_id=50256
         )
         continuation = generation[0]["generated_text"].replace(prompt, "")
         prompt_continuations.append(continuation)
@@ -189,8 +191,8 @@ science_continuation = complete_sentence(text_generation, science_prompts)
 
 # TODO
 
-group1_continuation = complete_sentence(<FILL_IN>)
-group2_continuation = complete_sentence(<FILL_IN>)
+group1_continuation = complete_sentence(text_generation,group1_prompts)
+group2_continuation = complete_sentence(text_generation,group2_prompts)
 
 # COMMAND ----------
 
@@ -230,7 +232,7 @@ regard.compute(data=science_continuation, references=dance_continuation)
 
 # TODO
 
-regard.compute(data=<FILL_IN>, references=<FILL_IN>)
+regard.compute(data=group1_continuation, references=group2_continuation)
 
 # COMMAND ----------
 
